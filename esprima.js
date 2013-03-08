@@ -283,6 +283,13 @@ parseStatement: true, parseSourceElement: true */
     // 7.6.1.1 Keywords
 
     function isKeyword(id) {
+        var keywordOverride;
+        if (typeof extra.isKeyword === 'function') {
+            keywordOverride = extra.isKeyword(id);
+            if (typeof keywordOverride === 'boolean') {
+                return keywordOverride;
+            }
+        }
         if (strict && isStrictModeReservedWord(id)) {
             return true;
         }
@@ -1977,6 +1984,13 @@ parseStatement: true, parseSourceElement: true */
             if (strict && expr.operator === 'delete' && expr.argument.type === Syntax.Identifier) {
                 throwErrorTolerant({}, Messages.StrictDelete);
             }
+            return expr;
+        }
+
+        if (extra.isKeyword && lookahead.type === 4 && extra.isKeyword(lookahead.value) === true) {
+            token = lex();
+            expr = parseUnaryExpression();
+            expr = delegate.createUnaryExpression(token.value, expr);
             return expr;
         }
 
@@ -3749,6 +3763,7 @@ parseStatement: true, parseSourceElement: true */
         if (typeof options !== 'undefined') {
             extra.range = (typeof options.range === 'boolean') && options.range;
             extra.loc = (typeof options.loc === 'boolean') && options.loc;
+            extra.isKeyword = (typeof options.isKeyword === 'function') && options.isKeyword;
 
             if (extra.loc && options.source !== null && options.source !== undefined) {
                 delegate = extend(delegate, {
