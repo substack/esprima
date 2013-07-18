@@ -286,7 +286,8 @@ parseStatement: true, parseSourceElement: true */
         var keywordOverride;
         if (typeof extra.isKeyword === 'function') {
             keywordOverride = extra.isKeyword(id);
-            if (typeof keywordOverride === 'boolean') {
+            if (typeof keywordOverride === 'boolean'
+            || typeof keywordOverride === 'string') {
                 return keywordOverride;
             }
         }
@@ -484,7 +485,7 @@ parseStatement: true, parseSourceElement: true */
     }
 
     function scanIdentifier() {
-        var start, id, type;
+        var start, id, fakeId, type;
 
         start = index;
 
@@ -495,7 +496,15 @@ parseStatement: true, parseSourceElement: true */
         // Thus, it must be an identifier.
         if (id.length === 1) {
             type = Token.Identifier;
-        } else if (isKeyword(id)) {
+        } else if (fakeId = isKeyword(id)) {
+            if (typeof fakeId === 'string') {
+                if (fakeId === 'block') {
+                    lookahead = advance();
+                    lookahead.keyword = id;
+                    return lookahead;
+                }
+                id = fakeId;
+            }
             type = Token.Keyword;
         } else if (id === 'null') {
             type = Token.NullLiteral;
@@ -1126,7 +1135,7 @@ parseStatement: true, parseSourceElement: true */
                 body: body
             };
         },
-
+ 
         createBreakStatement: function (label) {
             return {
                 type: Syntax.BreakStatement,
@@ -1382,11 +1391,13 @@ parseStatement: true, parseSourceElement: true */
                     prefix: true
                 };
             }
-            return {
+            var res = {
                 type: Syntax.UnaryExpression,
                 operator: operator,
                 argument: argument
             };
+            if (/^\w/.test(operator)) res.keyword = operator;
+            return res;
         },
 
         createVariableDeclaration: function (declarations, kind) {
@@ -1522,6 +1533,7 @@ parseStatement: true, parseSourceElement: true */
         if (token.type !== Token.Punctuator || token.value !== value) {
             throwUnexpected(token);
         }
+        else return token;
     }
 
     // Expect the next token to match the specified keyword.
@@ -1801,7 +1813,7 @@ parseStatement: true, parseSourceElement: true */
             token.value = null;
             return delegate.createLiteral(token);
         }
-
+ 
         if (match('[')) {
             return parseArrayInitialiser();
         }
@@ -1817,7 +1829,7 @@ parseStatement: true, parseSourceElement: true */
         if (match('/') || match('/=')) {
             return delegate.createLiteral(scanRegExp());
         }
-
+ 
         return throwUnexpected(lex());
     }
 
@@ -2216,13 +2228,15 @@ parseStatement: true, parseSourceElement: true */
     function parseBlock() {
         var block;
 
-        expect('{');
+        var t = expect('{');
 
         block = parseStatementList();
 
         expect('}');
 
-        return delegate.createBlockStatement(block);
+        var db = delegate.createBlockStatement(block);
+        if (t.keyword) db.keyword = t.keyword;
+        return db;
     }
 
     // 12.2 Variable Statement
